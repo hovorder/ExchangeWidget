@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>汇率转换 · 计算器</title>
+<style>
+  :root {
+    --bg: rgba(30,30,34,0.93);
+    --text: #ffffff;
+    --muted: rgba(255,255,255,0.5);
+    --accent: #ff9f0a;
+    --card: rgba(255,255,255,0.07);
+    --card-hover: rgba(255,255,255,0.12);
+    --line: rgba(255,255,255,0.06);
+    --shadow: 0 20px 60px rgba(0,0,0,0.5);
+    --calc-num: rgba(255,255,255,0.10);
+    --calc-fn: rgba(255,255,255,0.22);
+    --calc-fn-text: #ffffff;
+  }
+  html[data-theme="light"] {
+    --bg: rgba(244,244,247,0.95);
+    --text: #1c1c1e;
+    --muted: rgba(0,0,0,0.45);
+    --accent: #ff9500;
+    --card: rgba(0,0,0,0.04);
+    --card-hover: rgba(0,0,0,0.07);
+    --line: rgba(0,0,0,0.06);
+    --shadow: 0 20px 60px rgba(0,0,0,0.18);
+    --calc-num: rgba(0,0,0,0.05);
+    --calc-fn: rgba(0,0,0,0.12);
+    --calc-fn-text: #1c1c1e;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: transparent; color: var(--text);
+    -webkit-font-smoothing: antialiased; overflow: hidden;
+  }
+  .widget {
+    position: fixed; top: 20px; right: 20px; width: 360px;
+    display: flex; flex-direction: column;
+    background: var(--bg);
+    backdrop-filter: blur(26px) saturate(170%);
+    -webkit-backdrop-filter: blur(26px) saturate(170%);
+    border: 1px solid var(--line);
+    border-radius: 28px; box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  html.native .widget {
+    position: relative; top: 0; right: 0; width: 100%; height: 100%;
+    border-radius: 0; border: none; box-shadow: none;
+  }
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 18px 10px; cursor: grab; user-select: none;
+  }
+  .topbar:active { cursor: grabbing; }
+  .brand { font-size: 16px; font-weight: 700; letter-spacing: .3px; }
+  .sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .btns { display: flex; gap: 2px; }
+  .icon-btn {
+    border: none; background: transparent; color: var(--muted);
+    width: 32px; height: 32px; border-radius: 11px; cursor: pointer;
+    font-size: 15px; display: grid; place-items: center;
+  }
+  .icon-btn:hover { background: var(--card-hover); color: var(--text); }
+
+  .tabs { display: flex; gap: 6px; padding: 0 18px 10px; }
+  .tab {
+    flex: 1; border: none; background: transparent; color: var(--muted);
+    padding: 8px; border-radius: 12px; font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: background .15s ease, color .15s ease;
+  }
+  .tab.active { background: var(--accent); color: #fff; }
+  .view { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+  .view[hidden] { display: none; }
+
+  .rows { flex: 1; overflow-y: auto; padding: 4px 12px 8px; }
+  .rows::-webkit-scrollbar { width: 0; }
+  .row {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--card); border-radius: 22px;
+    padding: 13px 16px; margin: 9px 0; gap: 10px;
+    transition: background .15s ease;
+  }
+  .row:not(.fixed):hover { background: var(--card-hover); }
+  .row.fixed { background: rgba(255,159,10,0.12); }
+  .row-left { display: flex; align-items: center; gap: 11px; min-width: 0; user-select: none; }
+  .row-left[data-pick] { cursor: pointer; }
+  .flag { font-size: 26px; }
+  .meta { min-width: 0; }
+  .code { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 4px; }
+  .chev { font-size: 11px; color: var(--muted); }
+  .name { font-size: 11px; color: var(--muted); margin-top: 1px; }
+  .row-right { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+  .amt-input {
+    border: none; background: rgba(127,127,127,0.14); color: var(--text);
+    font-size: 23px; font-weight: 300; text-align: right; width: 138px; outline: none;
+    font-variant-numeric: tabular-nums; border-radius: 14px; padding: 7px 12px;
+    transition: background .15s ease, box-shadow .15s ease;
+  }
+  .amt-input:focus { background: rgba(127,127,127,0.22); box-shadow: 0 0 0 2px var(--accent); }
+  .rate { font-size: 10px; color: var(--muted); padding-right: 2px; }
+
+  .addrow {
+    width: calc(100% - 24px); margin: 2px 12px 12px; padding: 12px;
+    border: 1.5px dashed var(--line); background: transparent; color: var(--muted);
+    border-radius: 20px; cursor: pointer; font-size: 13px; font-weight: 600;
+  }
+  .addrow:hover { color: var(--accent); border-color: var(--accent); }
+  .foot { font-size: 11px; color: var(--muted); text-align: center; padding: 9px; border-top: 1px solid var(--line); }
+  .foot.err { color: #ff453a; }
+
+  .picker { position: absolute; inset: 0; background: rgba(0,0,0,0.45);
+    display: flex; align-items: flex-end; justify-content: center; z-index: 10; }
+  .picker[hidden] { display: none; }
+  .picker-box {
+    width: 100%; max-height: 82%; background: var(--bg);
+    border-radius: 22px 22px 0 0; padding: 16px 14px 20px;
+    display: flex; flex-direction: column; backdrop-filter: blur(26px);
+    -webkit-backdrop-filter: blur(26px); border-top: 1px solid var(--line);
+  }
+  .picker-search {
+    width: 100%; border: none; background: rgba(127,127,127,0.16); color: var(--text);
+    border-radius: 14px; padding: 11px 14px; font-size: 14px; outline: none;
+  }
+  .picker-search:focus { box-shadow: 0 0 0 2px var(--accent); }
+  .picker-list { overflow-y: auto; margin-top: 12px; }
+  .pick { display: flex; align-items: center; gap: 11px; padding: 11px 10px; border-radius: 14px; cursor: pointer; }
+  .pick:hover { background: var(--card-hover); }
+  .pick .flag { font-size: 22px; }
+  .pick .code { font-size: 15px; font-weight: 700; }
+  .pick .name { font-size: 12px; color: var(--muted); }
+  .picker-head { font-size: 13px; font-weight: 600; color: var(--text); padding: 4px 4px 10px; }
+
+  /* ---------- 计算器 ---------- */
+  .calc-display {
+    text-align: right; font-size: 40px; font-weight: 300; line-height: 1.15;
+    font-variant-numeric: tabular-nums; padding: 10px 18px 8px;
+    min-height: 64px; overflow: hidden; white-space: nowrap; flex-shrink: 0;
+  }
+  .calc-hist { flex: 1; min-height: 0; overflow-y: auto; padding: 2px 14px; }
+  .calc-hist::-webkit-scrollbar { width: 0; }
+  .hist-item { display: flex; justify-content: space-between; gap: 12px; padding: 8px 4px;
+    border-bottom: 1px solid var(--line); font-size: 13px; cursor: pointer; }
+  .hist-item:hover { background: var(--card-hover); }
+  .hist-item .he { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hist-item .hr { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .calc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; padding: 6px 14px 4px; flex-shrink: 0; }
+  .calc-btn {
+    height: 58px; border: none; border-radius: 50%; font-size: 22px; font-weight: 500;
+    cursor: pointer; color: var(--text); background: var(--calc-num);
+    display: flex; align-items: center; justify-content: center; user-select: none;
+    transition: opacity .1s ease;
+  }
+  .calc-btn:active { opacity: .65; }
+  .calc-btn.fn { background: var(--calc-fn); color: var(--calc-fn-text); }
+  .calc-btn.op { background: var(--accent); color: #fff; }
+  .calc-btn.zero { grid-column: span 2; border-radius: 29px; justify-content: flex-start; padding-left: 24px; }
+  .calc-foot { display: flex; gap: 8px; padding: 12px 14px 16px; flex-shrink: 0; }
+  .calc-fill { flex: 1; border: none; background: var(--accent); color: #fff; padding: 11px;
+    border-radius: 14px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .calc-clearhist { border: 1px solid var(--line); background: transparent; color: var(--muted);
+    padding: 11px 14px; border-radius: 14px; font-size: 13px; cursor: pointer; }
+
+  /* 填入汇率：内嵌小下拉，不遮挡计算器网格 */
+  #fillPicker { position: absolute; inset: 0; z-index: 20; }
+  #fillBackdrop { position: absolute; inset: 0; background: transparent; }
+  #fillPickerBox {
+    position: absolute; left: 14px; right: 14px; bottom: 76px;
+    max-height: 304px; overflow-y: auto;
+    background: var(--bg); border: 1px solid var(--line); border-radius: 18px;
+    padding: 10px 8px; backdrop-filter: blur(26px); -webkit-backdrop-filter: blur(26px);
+    box-shadow: var(--shadow);
+  }
+  #fillPicker .picker-head { font-size: 13px; font-weight: 600; color: var(--text); padding: 4px 6px 8px; }
+  #fillPicker .pick { display: flex; align-items: center; gap: 11px; padding: 9px 8px; border-radius: 12px; cursor: pointer; }
+  #fillPicker .pick:hover { background: var(--card-hover); }
+  #fillPicker .pick .flag { font-size: 22px; }
+  #fillPicker .pick .code { font-size: 15px; font-weight: 700; }
+  #fillPicker .pick .name { font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="widget" id="widget">
+  <div class="topbar" id="dragBar">
+    <div>
+      <div class="brand">💱 汇率转换</div>
+      <div class="sub">输入任意币种，自动换算</div>
+    </div>
+    <div class="btns">
+      <button class="icon-btn" id="refreshBtn" title="刷新">⟳</button>
+      <button class="icon-btn" id="themeBtn" title="主题">☀️</button>
+      <button class="icon-btn" id="closeBtn" title="收起">✕</button>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="fx">汇率</button>
+    <button class="tab" data-tab="calc">计算</button>
+  </div>
+
+  <div class="view" id="fxView">
+    <div class="rows" id="rows"></div>
+    <button class="addrow" id="addRow">+ 添加货币</button>
+    <div class="foot" id="foot">加载中…</div>
+  </div>
+
+  <div class="view" id="calcView" hidden>
+    <div class="calc-display" id="calcDisplay">0</div>
+    <div class="calc-hist" id="calcHist"></div>
+    <div class="calc-grid">
+      <button class="calc-btn fn" data-k="AC">AC</button>
+      <button class="calc-btn fn" data-k="±">±</button>
+      <button class="calc-btn fn" data-k="%">%</button>
+      <button class="calc-btn fn" data-k="⌫">⌫</button>
+      <button class="calc-btn" data-k="7">7</button>
+      <button class="calc-btn" data-k="8">8</button>
+      <button class="calc-btn" data-k="9">9</button>
+      <button class="calc-btn op" data-k="÷">÷</button>
+      <button class="calc-btn" data-k="4">4</button>
+      <button class="calc-btn" data-k="5">5</button>
+      <button class="calc-btn" data-k="6">6</button>
+      <button class="calc-btn op" data-k="×">×</button>
+      <button class="calc-btn" data-k="1">1</button>
+      <button class="calc-btn" data-k="2">2</button>
+      <button class="calc-btn" data-k="3">3</button>
+      <button class="calc-btn op" data-k="−">−</button>
+      <button class="calc-btn zero" data-k="0">0</button>
+      <button class="calc-btn" data-k=".">.</button>
+      <button class="calc-btn op" data-k="=">=</button>
+    </div>
+    <div class="calc-foot">
+      <button class="calc-fill" id="calcFill">↩ 填入汇率 ▾</button>
+      <button class="calc-clearhist" id="calcClearHist">清空</button>
+    </div>
+  </div>
+</div>
+
+<div id="fillPicker" hidden>
+  <div id="fillBackdrop"></div>
+  <div class="picker-box" id="fillPickerBox">
+    <div class="picker-head">选择填入币种</div>
+    <div class="picker-list" id="fillList"></div>
+  </div>
+</div>
+
+<div class="picker" id="picker" hidden>
+  <div class="picker-box" id="pickerBox">
+    <input class="picker-search" id="pickerSearch" placeholder="搜索 (如 USD / 美元 / 欧元)" />
+    <div class="picker-list" id="pickerList"></div>
+  </div>
+</div>
+
+<script>
+const API = "https://open.er-api.com/v6/latest/USD";
+const BASE = "CNY";
+const META = {
+  USD:{n:"美元",f:"🇺🇸"}, CNY:{n:"人民币",f:"🇨🇳"}, EUR:{n:"欧元",f:"🇪🇺"},
+  JPY:{n:"日元",f:"🇯🇵"}, GBP:{n:"英镑",f:"🇬🇧"}, HKD:{n:"港币",f:"🇭🇰"},
+  AUD:{n:"澳元",f:"🇦🇺"}, CAD:{n:"加元",f:"🇨🇦"}, CHF:{n:"瑞士法郎",f:"🇨🇭"},
+  SGD:{n:"新加坡元",f:"🇸🇬"}, KRW:{n:"韩元",f:"🇰🇷"}, TWD:{n:"新台币",f:"🇹🇼"},
+  MOP:{n:"澳门元",f:"🇲🇴"}, THB:{n:"泰铢",f:"🇹🇭"}, MYR:{n:"马来西亚林吉特",f:"🇲🇾"},
+  NZD:{n:"新西兰元",f:"🇳🇿"}, INR:{n:"印度卢比",f:"🇮🇳"}, RUB:{n:"卢布",f:"🇷🇺"},
+  BRL:{n:"巴西雷亚尔",f:"🇧🇷"}, ZAR:{n:"南非兰特",f:"🇿🇦"}, SEK:{n:"瑞典克朗",f:"🇸🇪"},
+  NOK:{n:"挪威克朗",f:"🇳🇴"}, DKK:{n:"丹麦克朗",f:"🇩🇰"}, MXN:{n:"墨西哥比索",f:"🇲🇽"},
+  PHP:{n:"菲律宾比索",f:"🇵🇭"}, IDR:{n:"印尼盾",f:"🇮🇩"}, VND:{n:"越南盾",f:"🇻🇳"},
+  AED:{n:"阿联酋迪拉姆",f:"🇦🇪"}, SAR:{n:"沙特里亚尔",f:"🇸🇦"}
+};
+const DEFAULT_SLOTS = ["CNY","USD","EUR","INR","VND"];
+
+let usdRates = {};
+let slots = loadSlots();
+let state = { code: "CNY", amount: 100 }; // 最近一次编辑的币种与金额（换算基准）
+
+const $ = id => document.getElementById(id);
+function meta(c){ return META[c] || {n:c, f:"🏳️"}; }
+function loadSlots(){
+  try { const s = JSON.parse(localStorage.getItem("fx-slots")); if (Array.isArray(s) && s.length >= 5) return s; } catch(e){}
+  return DEFAULT_SLOTS.slice();
+}
+function saveSlots(){ try { localStorage.setItem("fx-slots", JSON.stringify(slots)); } catch(e){} }
+
+function rateCNY(code){ return usdRates[code] / usdRates[BASE]; }
+function cross(code){ return state.amount * usdRates[code] / usdRates[state.code]; }
+function fmt(n){
+  if (!isFinite(n)) return "—";
+  if (n === 0) return "0";
+  const abs = Math.abs(n);
+  const dec = abs >= 1000 ? 2 : abs >= 1 ? 2 : 4;
+  return n.toLocaleString("zh-CN", {minimumFractionDigits: dec, maximumFractionDigits: dec});
+}
+
+function render(){
+  $("rows").innerHTML = slots.map((code, i) => {
+    const m = meta(code), fixed = i === 0;
+    const r = rateCNY(code);
+    return `<div class="row${fixed ? " fixed" : ""}" data-i="${i}">
+      <div class="row-left" ${fixed ? "" : `data-pick="${i}"`}>
+        <span class="flag">${m.f}</span>
+        <div class="meta">
+          <div class="code">${code}${fixed ? "" : ' <span class="chev">⌄</span>'}</div>
+          <div class="name">${m.n}</div>
+        </div>
+      </div>
+      <div class="row-right">
+        <input class="amt-input" id="amt-${i}" inputmode="decimal" value="${fmt(cross(code))}" />
+        <div class="rate">1 CNY = ${fmt(r)} ${code}</div>
+      </div>
+    </div>`;
+  }).join("");
+
+  slots.forEach((code, i) => {
+    const inp = $("amt-" + i);
+    inp.addEventListener("input", () => onInput(i));
+    inp.addEventListener("blur", () => onBlur(i));
+    if (i !== 0) {
+      const left = $("rows").querySelector(`.row-left[data-pick="${i}"]`);
+      if (left) left.onclick = () => openPicker(i);
+    }
+  });
+}
+function onInput(i){
+  const v = parseFloat(($("amt-" + i).value || "").replace(/,/g, "")) || 0;
+  state.code = slots[i]; state.amount = v;
+  slots.forEach((code, j) => { if (j !== i) $("amt-" + j).value = fmt(cross(code)); });
+}
+function onBlur(i){ $("amt-" + i).value = fmt(cross(slots[i])); }
+
+// 选币面板
+let pickerIdx = null;
+function openPicker(i){
+  pickerIdx = i;
+  $("pickerSearch").value = "";
+  renderPicker("");
+  $("picker").hidden = false;
+  setTimeout(() => $("pickerSearch").focus(), 30);
+}
+function closePicker(){ $("picker").hidden = true; pickerIdx = null; }
+function renderPicker(f){
+  const fu = f.trim().toUpperCase();
+  const codes = Object.keys(usdRates).sort();
+  $("pickerList").innerHTML = codes
+    .filter(c => !fu || c.includes(fu) || meta(c).n.includes(f.trim()))
+    .map(c => { const m = meta(c); return `<div class="pick" data-c="${c}"><span class="flag">${m.f}</span><span class="code">${c}</span><span class="name">${m.n}</span></div>`; })
+    .join("") || `<div class="name" style="padding:12px;text-align:center;color:var(--muted)">未找到</div>`;
+  $("pickerList").querySelectorAll(".pick").forEach(el => {
+    el.onclick = () => { slots[pickerIdx] = el.dataset.c; saveSlots(); render(); closePicker(); };
+  });
+}
+$("pickerSearch").oninput = e => renderPicker(e.target.value);
+$("picker").onclick = e => { if (e.target === $("picker")) closePicker(); };
+$("pickerBox").onclick = e => e.stopPropagation();
+$("addRow").onclick = () => {
+  const used = new Set(slots);
+  const common = ["USD","EUR","JPY","GBP","HKD","AUD","CAD","CHF","SGD","KRW","INR","VND","THB","MYR","TWD","NZD"];
+  const next = common.find(c => !used.has(c)) || Object.keys(usdRates).find(c => !used.has(c)) || "USD";
+  slots.push(next); saveSlots(); render(); openPicker(slots.length - 1);
+};
+
+async function load(){
+  const btn = $("refreshBtn");
+  btn.classList.add("spin");
+  $("foot").classList.remove("err");
+  $("foot").textContent = "刷新中…";
+  try {
+    const res = await fetch(API, {cache:"no-store"});
+    const data = await res.json();
+    if (data.result !== "success") throw new Error("API 异常");
+    usdRates = data.rates;
+    const d = new Date((data.time_last_update_unix || 0) * 1000);
+    $("foot").textContent = "更新: " + (isNaN(d) ? "" : d.toLocaleString("zh-CN"));
+    if ($("rows").children.length === 0) render();
+    else {
+      slots.forEach((code, i) => {
+        const inp = $("amt-" + i);
+        if (document.activeElement !== inp) inp.value = fmt(cross(code));
+        const rateEl = inp.parentElement.querySelector(".rate");
+        if (rateEl) rateEl.textContent = "1 CNY = " + fmt(rateCNY(code)) + " " + code;
+      });
+    }
+  } catch(e){
+    $("foot").textContent = "获取失败，将自动重试";
+    $("foot").classList.add("err");
+  } finally {
+    setTimeout(() => btn.classList.remove("spin"), 600);
+  }
+}
+
+// 主题
+$("themeBtn").onclick = () => {
+  const cur = document.documentElement.getAttribute("data-theme");
+  const next = cur === "light" ? "" : "light";
+  if (next) document.documentElement.setAttribute("data-theme", next); else document.documentElement.removeAttribute("data-theme");
+  $("themeBtn").textContent = next === "light" ? "🌙" : "☀️";
+  try { localStorage.setItem("fx-theme", next || "dark"); } catch(e){}
+};
+try {
+  const t = localStorage.getItem("fx-theme");
+  if (t === "light"){ document.documentElement.setAttribute("data-theme","light"); $("themeBtn").textContent = "🌙"; }
+} catch(e){}
+
+// 原生桥接
+const NATIVE = !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.drag);
+if (NATIVE) document.documentElement.classList.add("native");
+$("refreshBtn").onclick = load;
+$("closeBtn").onclick = () => {
+  if (window.webkit && window.webkit.messageHandlers.ctl) window.webkit.messageHandlers.ctl.postMessage({action:"close"});
+  else window.close();
+};
+(function(){
+  const bar = $("dragBar"), w = $("widget");
+  let dragging = false, lx, ly;
+  bar.onmousedown = e => {
+    if (e.target.closest && e.target.closest(".icon-btn")) return;
+    dragging = true; lx = e.clientX; ly = e.clientY; e.preventDefault();
+  };
+  window.onmousemove = e => {
+    if (!dragging) return;
+    const dx = e.clientX - lx, dy = e.clientY - ly; lx = e.clientX; ly = e.clientY;
+    if (NATIVE && window.webkit.messageHandlers.drag) window.webkit.messageHandlers.drag.postMessage({dx, dy});
+    else { const r = w.getBoundingClientRect(); w.style.right="auto"; w.style.bottom="auto"; w.style.left=(r.left+dx)+"px"; w.style.top=(r.top+dy)+"px"; }
+  };
+  window.onmouseup = () => dragging = false;
+})();
+
+// ================= 计算器 =================
+const OPS = { "+":"+", "−":"-", "×":"*", "÷":"/" };
+let calcHist = loadCalcHist();
+
+function loadCalcHist(){
+  try { const h = JSON.parse(localStorage.getItem("fx-calc-hist")); return Array.isArray(h) ? h : []; } catch(e){ return []; }
+}
+function fmtNum(n){
+  const num = parseFloat(n);
+  if (!isFinite(num)) return String(n);
+  const dec = (num % 1 === 0) ? 0 : (Math.abs(num) < 1 ? 6 : 2);
+  return num.toLocaleString("zh-CN", {minimumFractionDigits: 0, maximumFractionDigits: dec});
+}
+const calc = { cur: "0", prev: null, op: null, justEval: false, display: $("calcDisplay") };
+
+function calcRender(){
+  calc.display.textContent = calc.cur === "" ? "0" : calc.cur;
+}
+function calcInput(k){
+  const c = calc;
+  if (/[0-9]/.test(k)){
+    if (c.justEval){ c.cur = "0"; c.justEval = false; }
+    if (c.cur === "0") c.cur = k;
+    else if (c.cur.replace(/[-.]/g, "").length < 12) c.cur += k;
+  } else if (k === "."){
+    if (c.justEval){ c.cur = "0"; c.justEval = false; }
+    if (!c.cur.includes(".")) c.cur += ".";
+  } else if (k === "AC"){
+    c.cur = "0"; c.prev = null; c.op = null; c.justEval = false;
+  } else if (k === "⌫"){
+    if (c.justEval){ c.cur = "0"; c.prev = null; c.op = null; c.justEval = false; }
+    else { c.cur = c.cur.length > 1 ? c.cur.slice(0, -1) : "0"; }
+  } else if (k === "±"){
+    if (c.cur !== "0" && c.cur !== "错误") c.cur = c.cur.startsWith("-") ? c.cur.slice(1) : "-" + c.cur;
+  } else if (k === "%"){
+    const v = parseFloat(c.cur);
+    if (isFinite(v)) c.cur = String(v / 100);
+  } else if (OPS[k]){
+    if (c.prev !== null && c.op && !c.justEval) doEquals(false);
+    c.prev = c.cur; c.op = k; c.justEval = true;
+  } else if (k === "="){
+    doEquals(true);
+  }
+  calcRender();
+}
+function doEquals(store){
+  const c = calc;
+  if (c.prev === null || c.op === null) return;
+  const a = parseFloat(c.prev), b = parseFloat(c.cur);
+  let r = 0;
+  const op = OPS[c.op];
+  if (op === "+") r = a + b;
+  else if (op === "-") r = a - b;
+  else if (op === "*") r = a * b;
+  else if (op === "/") r = (b === 0) ? NaN : a / b;
+  if (!isFinite(r)){
+    c.cur = "错误"; c.prev = null; c.op = null; c.justEval = true; calcRender(); return;
+  }
+  r = Math.round(r * 1e10) / 1e10;
+  const expr = `${fmtNum(c.prev)} ${c.op} ${fmtNum(c.cur)} =`;
+  c.cur = String(r);
+  c.prev = null; c.op = null; c.justEval = true;
+  calc.display.textContent = fmtNum(r);
+  if (store) pushHist(expr, fmtNum(r));
+}
+function pushHist(expr, res){
+  calcHist.unshift({ e: expr, r: res });
+  calcHist = calcHist.slice(0, 20);
+  try { localStorage.setItem("fx-calc-hist", JSON.stringify(calcHist)); } catch(e){}
+  renderHist();
+}
+function renderHist(){
+  const box = $("calcHist");
+  box.innerHTML = calcHist.length
+    ? calcHist.map(h => `<div class="hist-item" data-r="${h.r}"><span class="he">${h.e}</span><span class="hr">${h.r}</span></div>`).join("")
+    : `<div class="name" style="text-align:center;color:var(--muted);padding:14px;">暂无记录</div>`;
+  box.querySelectorAll(".hist-item").forEach(el => {
+    el.onclick = () => { calc.cur = el.dataset.r.replace(/,/g, ""); calc.justEval = true; calc.display.textContent = el.dataset.r; };
+  });
+}
+document.querySelectorAll(".calc-btn").forEach(b => {
+  b.onclick = () => calcInput(b.dataset.k);
+});
+$("calcClearHist").onclick = () => {
+  calcHist = [];
+  try { localStorage.removeItem("fx-calc-hist"); } catch(e){}
+  renderHist();
+};
+// 联动：把计算结果填回选中的汇率行（弹出币种列表选择目标）
+$("calcFill").onclick = () => openFillPicker();
+function openFillPicker(){
+  const list = $("fillList");
+  list.innerHTML = slots.map((c, i) => {
+    const m = meta(c);
+    return `<div class="pick" data-i="${i}"><span class="flag">${m.f}</span><span class="code">${c}</span><span class="name">${m.n}</span></div>`;
+  }).join("");
+  list.querySelectorAll(".pick").forEach(el => {
+    el.onclick = () => fillInto(parseInt(el.dataset.i, 10));
+  });
+  $("fillPicker").hidden = false;
+}
+function fillInto(i){
+  const val = parseFloat(calc.cur.replace(/,/g, ""));
+  if (!isFinite(val)) return;
+  const inp = $("amt-" + i);
+  if (!inp) return;
+  inp.value = fmt(val);
+  onInput(i);
+  $("fillPicker").hidden = true;
+  switchTab("fx");
+}
+$("fillBackdrop").onclick = () => { $("fillPicker").hidden = true; };
+$("fillPickerBox").onclick = e => e.stopPropagation();
+// 物理键盘（仅在计算器视图可见时拦截）
+window.addEventListener("keydown", e => {
+  if ($("calcView").hidden) return;
+  const k = e.key;
+  if (/[0-9]/.test(k)) calcInput(k);
+  else if (k === ".") calcInput(".");
+  else if (k === "+") calcInput("+");
+  else if (k === "-") calcInput("−");
+  else if (k === "*") calcInput("×");
+  else if (k === "/") calcInput("÷");
+  else if (k === "Enter" || k === "=") calcInput("=");
+  else if (k === "Backspace") calcInput("⌫");
+  else if (k === "Escape") calcInput("AC");
+  else if (k === "%") calcInput("%");
+  else return;
+  e.preventDefault();
+});
+
+// ================= Tab 切换 =================
+function switchTab(name){
+  document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === name));
+  $("fxView").hidden = name !== "fx";
+  $("calcView").hidden = name !== "calc";
+}
+document.querySelectorAll(".tab").forEach(t => { t.onclick = () => switchTab(t.dataset.tab); });
+
+// 初始化
+render();
+load();
+renderHist();
+setInterval(load, 60000);
+</script>
+</body>
+</html>
