@@ -1,6 +1,6 @@
 # ExchangeWidget
 
-macOS 原生菜单栏汇率换算 + 计算器浮窗。轻量、无 Electron、无第三方依赖。
+macOS 原生菜单栏浮窗（App 显示名「跨境运营计算器」）：汇率换算 + 计算器合二为一。轻量、无 Electron、无第三方依赖。
 
 ## 功能
 
